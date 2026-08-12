@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { mockComments, Comment } from '../../lib/mockData';
+import { fetchCommentsFromFirebase, saveCommentToFirebase, deleteCommentFromFirebase, Comment } from '../../lib/firebase';
 import { format } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { Check, X, Trash2 } from 'lucide-react';
@@ -14,20 +14,35 @@ export default function AdminComments() {
     fetchComments();
   }, []);
 
-  const fetchComments = async () => {
+ const fetchComments = async () => {
     setLoading(true);
-    setComments([...mockComments]);
+    const list = await fetchCommentsFromFirebase();
+    setComments(list);
     setLoading(false);
   };
 
-  const handleApprove = async (id: string, currentStatus: boolean) => {
+const handleApprove = async (id: string, currentStatus: boolean) => {
     const nextStatus = !currentStatus;
+    const comment = comments.find(c => c.id === id);
+    if (!comment) return;
+    
     setComments(comments.map(c => c.id === id ? { ...c, is_approved: nextStatus } : c));
+    try {
+      await saveCommentToFirebase({ ...comment, is_approved: nextStatus });
+    } catch (err) {
+      console.warn("Failed to approve", err);
+      setComments(comments.map(c => c.id === id ? { ...c, is_approved: currentStatus } : c));
+    }
   };
 
-  const handleDelete = async (id: string) => {
+ const handleDelete = async (id: string) => {
     if (!window.confirm(lang === 'fr' ? 'Supprimer ce commentaire ?' : 'Delete this comment?')) return;
     setComments(comments.filter(c => c.id !== id));
+    try {
+      await deleteCommentFromFirebase(id);
+    } catch (err) {
+      console.warn("Failed to delete", err);
+    }
   };
 
   if (loading) {
