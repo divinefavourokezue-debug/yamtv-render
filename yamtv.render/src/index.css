@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+
+  --color-primary: #DC2626;
+  --color-charcoal: #000000;
+  --color-offwhite: #FAFAFA;
+
+  --animate-fade-in-up: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-marquee: marquee 30s linear infinite;
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-33.33%);
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply font-sans text-charcoal dark:text-[#EAEAEA] bg-[#FFFFFF] dark:bg-[#080808] antialiased leading-[1.8] text-[17px] transition-colors duration-300;
+  }
+  
+  /* Subtle Grain Texture */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  .dark body::before {
+    opacity: 0.03;
+    mix-blend-mode: overlay;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans text-black dark:text-white font-bold tracking-tight transition-colors duration-500 ease-[cubic-bezier(0.16,1,0.3,1)];
+  }
+
+  ::selection {
+    @apply bg-primary/20 text-charcoal dark:text-white;
+  }
+}
+
+@layer components {
+  .label {
+    @apply text-[12px] uppercase tracking-[0.2em] font-semibold text-gray-500;
+  }
+  .red-bg {
+    @apply bg-primary;
+  }
+  .red-accent {
+    @apply text-primary;
+  }
+  .premium-border {
+    @apply border-t border-b border-gray-100 dark:border-gray-800/60 py-[24px];
+  }
+  .image-overlay {
+    @apply absolute inset-0 bg-gradient-to-t from-charcoal/70 via-charcoal/10 to-transparent;
+  }
+  
+  .news-card {
+    @apply transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] opacity-0 translate-y-[24px] will-change-transform;
+  }
+  
+  .news-card.is-visible {
+    @apply opacity-100 translate-y-0;
+  }
+
+  .news-card:hover {
+    @apply translate-y-[-4px];
+  }
+
+  .news-card:hover img {
+    @apply scale-[1.03];
+  }
+
+  /* Blockquote styling */
+  blockquote {
+    @apply relative overflow-hidden bg-white dark:bg-[#0A0A0A] p-8 md:p-12 my-12 border-l border-primary/30 rounded-r-3xl shadow-[0_4px_32px_rgba(0,0,0,0.02)] dark:shadow-[0_4px_32px_rgba(255,255,255,0.01)];
+  }
+  blockquote::before {
+    content: '"';
+    @apply absolute top-4 left-6 text-7xl text-primary/10 dark:text-primary/10 font-serif leading-none opacity-50;
+  }
+  blockquote p {
+    @apply relative z-10 text-xl md:text-2xl font-serif italic text-charcoal/90 dark:text-gray-200 leading-[1.9] m-0;
+  }
+  
+  /* Link hover animations */
+  .hover-underline {
+    @apply relative;
+  }
+  .hover-underline::after {
+    content: '';
+    @apply absolute w-full h-[1px] bg-current bottom-0 left-0 origin-right scale-x-0 transition-transform duration-[500ms] ease-[cubic-bezier(0.16,1,0.3,1)];
+  }
+  .hover-underline:hover::after {
+    @apply origin-left scale-x-100;
+  }
+
+  button:not(.no-lift) {
+    @apply transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] relative overflow-hidden;
+  }
+
+  button:not(.no-lift):hover {
+    @apply translate-y-[-2px] shadow-[0_12px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_24px_rgba(255,255,255,0.03)];
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+.embla { overflow: hidden; }
+

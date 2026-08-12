@@ -1,0 +1,6 @@
+{
+  "name": "YAMtv",
+  "description": "YAMtv is an independent online media dedicated to reliable, balanced, and accessible information for all.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
