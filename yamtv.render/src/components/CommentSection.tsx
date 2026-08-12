@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { mockComments, Comment } from '../lib/mockData';
+import { fetchCommentsFromFirebase, saveCommentToFirebase, Comment } from '../lib/firebase';
 import { formatDistanceToNow } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { MessageSquare, Send } from 'lucide-react';
@@ -19,10 +19,10 @@ export function CommentSection({ articleId }: { articleId: string }) {
     fetchComments();
   }, [articleId]);
 
-  const fetchComments = async () => {
+ const fetchComments = async () => {
     setLoading(true);
-    const filteredMock = mockComments.filter(c => c.article_id === articleId && c.is_approved);
-    setComments(filteredMock);
+    const fetched = await fetchCommentsFromFirebase(articleId);
+    setComments(fetched.filter(c => c.is_approved));
     setLoading(false);
   };
 
@@ -44,7 +44,8 @@ export function CommentSection({ articleId }: { articleId: string }) {
       is_approved: true,
     };
     
-    setComments(prev => [...prev, localComment]);
+    await saveCommentToFirebase(localComment); 
+    setComments(prev => [localComment, ...prev]);
     setNewComment('');
     setSubmitting(false);
   };
