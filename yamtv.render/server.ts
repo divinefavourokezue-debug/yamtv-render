@@ -107,7 +107,7 @@ function formatArticleForFirestore(article: any) {
     excerpt_en: truncate(article.excerpt_en || article.excerpt_fr || article.excerpt, 4800),
     content_fr: truncate(article.content_fr || article.content, 95000),
     content_en: truncate(article.content_en || article.content_fr || article.content, 95000),
-    featured_image_url: truncate(article.featured_image_url || article.image_url || article.image, 1900),
+   featured_image_url: article.featured_image_url || article.image_url || article.image || '',
     published_at: truncate(article.published_at || article.created_at || new Date().toISOString(), 90),
     is_published: isPublished,
     is_featured: !!(article.is_featured || article.featured),
