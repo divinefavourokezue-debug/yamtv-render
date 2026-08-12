@@ -179,3 +179,48 @@ export async function testFirebaseConnection(): Promise<{ success: boolean; coun
     throw new Error(err?.message || 'Failed to connect to Firebase Firestore');
   }
 }
+export interface Comment {
+  id: string;
+  article_id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
+  created_at: string;
+  is_approved: boolean;
+}
+
+export async function fetchCommentsFromFirebase(articleId?: string): Promise<Comment[]> {
+  try {
+    const commentsRef = collection(db, 'comments');
+    let q;
+    if (articleId) {
+      q = query(commentsRef, where('article_id', '==', String(articleId)), limit(500));
+    } else {
+      q = query(commentsRef, limit(1000));
+    }
+    const snapshot = await getDocs(q);
+    const list: Comment[] = [];
+    snapshot.forEach(docSnap => {
+      list.push({ ...docSnap.data(), id: docSnap.id } as Comment);
+    });
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch (err) {
+    console.warn('Firebase comments fetch error:', err);
+    return [];
+  }
+}
+
+export async function saveCommentToFirebase(comment: Comment): Promise<Comment> {
+  const docRef = doc(db, 'comments', String(comment.id));
+  await setDoc(docRef, comment, { merge: true });
+  return comment;
+}
+
+export async function deleteCommentFromFirebase(commentId: string): Promise<void> {
+  try {
+    const docRef = doc(db, 'comments', String(commentId));
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn('Firebase comments delete error:', err);
+  }
+}
