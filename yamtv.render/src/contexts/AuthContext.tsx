@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -50,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password?: string) => {
     if (!password) throw new Error("Password is required");
-    if (email.toLowerCase() === 'admin@yamtv.bf' && password === 'Yamtv2026!') {
+    if (email.toLowerCase().trim() === 'admin@yamtv.bf' && password.trim() === 'Yamtv2026!') {
       localStorage.setItem('yamtv_admin_logged', 'true');
       setUser({
         id: 'admin_123',
