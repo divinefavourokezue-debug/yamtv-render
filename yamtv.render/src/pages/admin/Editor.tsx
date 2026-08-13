@@ -10,14 +10,43 @@ import { Article } from '../../lib/mockData';
 const WordLikeEditor = ({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder: string }) => {
   const editorRef = useRef(null);
 
-  const config = useMemo(() => ({
+const config = useMemo(() => ({
     readonly: false,
     placeholder: placeholder || 'Start typing...',
     height: 600,
     toolbarButtonSize: 'middle' as const,
     uploader: {
-      insertImageAsBase64URI: true
+      insertImageAsBase64URI: false
     },
+    extraButtons: [
+      {
+        name: 'customImage',
+        icon: 'image',
+        tooltip: 'Insert Image',
+        exec: (editor: any) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.onchange = async (e: any) => {
+            const file = e.target.files[0];
+            if (file) {
+              const toastId = toast.loading('Uploading image...');
+              try {
+                // Dynamically import the upload function
+                const { uploadImageToFirebase } = await import('../../lib/firebase');
+                const url = await uploadImageToFirebase(file);
+                editor.selection.insertImage(url);
+                toast.success('Image inserted!', { id: toastId });
+              } catch (err) {
+                console.error("Image upload failed:", err);
+                toast.error('Upload failed', { id: toastId });
+              }
+            }
+          };
+          input.click();
+        }
+      }
+    ],
     buttons: [
       'source', '|',
       'bold',
@@ -34,7 +63,7 @@ const WordLikeEditor = ({ value, onChange, placeholder }: { value: string, onCha
       'fontsize',
       'brush',
       'paragraph', '|',
-      'image',
+      'customImage',
       'video',
       'table',
       'link', '|',
