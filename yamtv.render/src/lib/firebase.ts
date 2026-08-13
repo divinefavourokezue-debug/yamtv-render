@@ -33,17 +33,17 @@ export async function uploadImageToFirebase(file: File): Promise<string> {
         let width = img.width;
         let height = img.height;
         
-        // Limit max dimensions to 900px to ensure the resulting base64 string is small enough for Firestore
-        const max_size = 900; 
+        // Limit max dimensions to 650px to ensure base64 string is super lightweight (~35KB-50KB)
+        const max_size = 650; 
 
         if (width > height) {
           if (width > max_size) {
-            height *= max_size / width;
+            height = Math.round(height * (max_size / width));
             width = max_size;
           }
         } else {
           if (height > max_size) {
-            width *= max_size / height;
+            width = Math.round(width * (max_size / height));
             height = max_size;
           }
         }
@@ -61,8 +61,8 @@ export async function uploadImageToFirebase(file: File): Promise<string> {
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
         
-        // Compress to JPEG with 0.6 quality to keep size tiny for Firestore (limit 1MB per document)
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        // Compress to JPEG with 0.45 quality for maximum efficiency under Firestore 1MB limit
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
         resolve(dataUrl);
       };
       img.onerror = (err) => reject(err);
@@ -92,7 +92,6 @@ export interface FirebaseArticlePayload {
 
 /**
  * Helper to truncate strings safely before pushing to Firestore
- * INCREASED TO 900,000 to fit Base64 images!
  */
 function truncate(val: any, maxLen: number = 900000): string {
   if (val === null || val === undefined) return '';
@@ -125,13 +124,13 @@ export function formatArticleForFirestore(article: any) {
     id: artId,
     article_id: artId,
     title_fr: truncate(article.title_fr || article.title, 950) || 'Sans titre',
-    title_en: truncate(article.title_en || article.title_fr || article.title, 950),
+    title_en: truncate(article.title_en || '', 950),
     slug: truncate(article.slug || artId, 250),
     category: truncate(article.category, 200) || 'Actualités',
     excerpt_fr: truncate(article.excerpt_fr || article.excerpt, 4800),
-    excerpt_en: truncate(article.excerpt_en || article.excerpt_fr || article.excerpt, 4800),
+    excerpt_en: truncate(article.excerpt_en || '', 4800),
     content_fr: truncate(article.content_fr || article.content, 900000),
-    content_en: truncate(article.content_en || article.content_fr || article.content, 900000),
+    content_en: truncate(article.content_en || '', 900000),
     featured_image_url: article.featured_image_url || article.image_url || article.image || '',
     published_at: truncate(article.published_at || article.created_at || new Date().toISOString(), 90),
     is_published: isPublished,
@@ -164,6 +163,14 @@ export async function fetchArticlesFromFirebase(): Promise<any[]> {
  */
 export async function saveArticleToFirebase(article: any): Promise<any> {
   const payload = formatArticleForFirestore(article);
+  
+  // Check payload size against Firestore 1MB (1,048,576 bytes) document limit
+  const payloadJson = JSON.stringify(payload);
+  const sizeInBytes = new Blob([payloadJson]).size;
+  if (sizeInBytes > 1000000) {
+    throw new Error(`Article too large (${Math.round(sizeInBytes / 1024)} KB). Firebase document limit is 1000 KB. Please remove one or two images.`);
+  }
+  
   const docRef = doc(db, 'articles', payload.id);
   await setDoc(docRef, payload, { merge: true });
   return payload;
