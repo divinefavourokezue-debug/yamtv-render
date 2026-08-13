@@ -1,9 +1,11 @@
+import { Article, mapSupabaseArticle as mapArticleData, initialArticles } from './mockData';
 import { 
   fetchArticlesFromFirebase, 
   saveArticleToFirebase as fbSave, 
   batchSaveArticlesToFirebase as fbBatchSave, 
   deleteArticleFromFirebase as fbDelete 
 } from './firebase';
+
 let memoryCache: Article[] | null = null;
 const PRIMARY_CACHE_KEY = 'yamtv_articles_cache_v8';
 
@@ -91,13 +93,12 @@ export function clearArticlesCache() {
 export async function fetchPublishedArticles(): Promise<Article[]> {
   let appwriteArticles: Article[] | null = null;
   try {
-    appwriteArticles = await fetchAppwriteArticles();
+    appwriteArticles = await fetchArticlesFromFirebase();
   } catch (e) {
-    console.warn('Appwrite articles fetch notice:', e);
+    console.warn('Firebase articles fetch notice:', e);
   }
 
   let articles: Article[] = [];
-
   if (Array.isArray(appwriteArticles)) {
     articles = appwriteArticles.map(mapArticleData);
   } else if (memoryCache && memoryCache.length > 0) {
@@ -127,13 +128,12 @@ export async function fetchPublishedArticles(): Promise<Article[]> {
 export async function fetchAllArticles(): Promise<Article[]> {
   let appwriteArticles: Article[] | null = null;
   try {
-    appwriteArticles = await fetchAppwriteArticles();
+    appwriteArticles = await fetchArticlesFromFirebase();
   } catch (e) {
-    console.warn('Appwrite articles fetch notice:', e);
+    console.warn('Firebase articles fetch notice:', e);
   }
 
   let articles: Article[] = [];
-
   if (Array.isArray(appwriteArticles)) {
     articles = appwriteArticles.map(mapArticleData);
   } else {
@@ -151,7 +151,7 @@ export async function fetchAllArticles(): Promise<Article[]> {
 
 export async function fetchArticleById(idOrSlug: string): Promise<Article | null> {
   if (!idOrSlug) return null;
-
+  
   if (memoryCache) {
     const found = memoryCache.find(a => String(a.id) === String(idOrSlug) || String(a.slug) === String(idOrSlug));
     if (found) return mapArticleData(found);
@@ -165,12 +165,12 @@ export async function fetchArticleById(idOrSlug: string): Promise<Article | null
 export async function saveArticle(articleData: any): Promise<Article> {
   const articleId = String(articleData.id || `article_${Date.now()}`);
   const now = new Date().toISOString();
-
-  const isPub =
-    articleData.is_published !== undefined
-      ? !!articleData.is_published
-      : articleData.published !== undefined
-      ? !!articleData.published
+  
+  const isPub = 
+    articleData.is_published !== undefined 
+      ? !!articleData.is_published 
+      : articleData.published !== undefined 
+      ? !!articleData.published 
       : true;
 
   const docData = {
@@ -197,9 +197,10 @@ export async function saveArticle(articleData: any): Promise<Article> {
 
   // Sync to server disk/database synchronously
   try {
-    await saveAppwriteArticle(mapped);
+    await fbSave(mapped);
   } catch (e) {
     console.warn('Server article save notice:', e);
+    throw e;
   }
 
   try {
@@ -214,16 +215,18 @@ export async function saveArticlesBatch(articlesList: any[]): Promise<Article[]>
 
   if (!memoryCache) memoryCache = [];
   const map = new Map<string, Article>();
+  
   memoryCache.forEach(a => map.set(String(a.id), a));
   mappedList.forEach(a => map.set(String(a.id), a));
-
+  
   memoryCache = Array.from(map.values());
   setArticlesCache(memoryCache);
 
   try {
-    await saveAppwriteArticlesBatch(mappedList);
+    await fbBatchSave(mappedList);
   } catch (e) {
     console.warn('Server batch save notice:', e);
+    throw e;
   }
 
   try {
@@ -244,9 +247,10 @@ export async function deleteArticle(articleId: string, slug?: string): Promise<v
   }
 
   try {
-    await deleteAppwriteArticle(articleId, slug);
+    await fbDelete(articleId, slug);
   } catch (e) {
     console.warn('Server article delete notice:', e);
+    throw e;
   }
 
   try {
