@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -17,14 +18,14 @@ interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  loginCustomAdmin: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
-  loginCustomAdmin: async () => {},
+  login: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -47,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  const loginCustomAdmin = async (email: string, password?: string) => {
+  const login = async (email: string, password?: string) => {
     if (!password) throw new Error("Password is required");
     if (email.toLowerCase() === 'admin@yamtv.bf' && password === 'Yamtv2026!') {
       localStorage.setItem('yamtv_admin_logged', 'true');
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, loginCustomAdmin }}>
+    <AuthContext.Provider value={{ user, loading, signOut, login }}>
       {children}
     </AuthContext.Provider>
   );
