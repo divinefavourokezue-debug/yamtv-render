@@ -1,4 +1,3 @@
-
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -15,7 +14,14 @@ import {
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+
+export const firebaseConfig = {
+  projectId: "ai-studio-yamtv-9ce9f4cf",
+  appId: "1:858888272133:web:yamtv",
+  apiKey: "AIzaSyDummyKeyForAppletConfigOnly",
+  authDomain: "ai-studio-yamtv-9ce9f4cf.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-yamtv-9ce9f4cf-b30d-45f5-a0bf-58b0fd9847dc"
+};
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const firestoreDatabaseId = firebaseConfig.firestoreDatabaseId || 'ai-studio-yamtv-9ce9f4cf-b30d-45f5-a0bf-58b0fd9847dc';
