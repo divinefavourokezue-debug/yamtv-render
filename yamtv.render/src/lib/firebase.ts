@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -91,8 +92,9 @@ export interface FirebaseArticlePayload {
 
 /**
  * Helper to truncate strings safely before pushing to Firestore
+ * INCREASED TO 900,000 to fit Base64 images!
  */
-function truncate(val: any, maxLen: number = 95000): string {
+function truncate(val: any, maxLen: number = 900000): string {
   if (val === null || val === undefined) return '';
   const s = String(val).trim();
   return s.length > maxLen ? s.substring(0, maxLen) : s;
@@ -128,8 +130,8 @@ export function formatArticleForFirestore(article: any) {
     category: truncate(article.category, 200) || 'Actualités',
     excerpt_fr: truncate(article.excerpt_fr || article.excerpt, 4800),
     excerpt_en: truncate(article.excerpt_en || article.excerpt_fr || article.excerpt, 4800),
-    content_fr: truncate(article.content_fr || article.content, 95000),
-    content_en: truncate(article.content_en || article.content_fr || article.content, 95000),
+    content_fr: truncate(article.content_fr || article.content, 900000),
+    content_en: truncate(article.content_en || article.content_fr || article.content, 900000),
     featured_image_url: article.featured_image_url || article.image_url || article.image || '',
     published_at: truncate(article.published_at || article.created_at || new Date().toISOString(), 90),
     is_published: isPublished,
