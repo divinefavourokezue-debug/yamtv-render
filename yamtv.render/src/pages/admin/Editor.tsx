@@ -1,109 +1,25 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
-import { ArrowLeft, Save, Image as ImageIcon, Check, ImagePlus, Trash2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import JoditEditor from 'jodit-react';
+import { ImagePlus, Trash2, ArrowLeft, Save, Eye, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
+import JoditEditor from 'jodit-react';
 import { fetchArticleById, saveArticle, deleteArticle } from '../../lib/articlesService';
-import { Article } from '../../lib/mockData';
-
-const WordLikeEditor = ({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder: string }) => {
-  const editorRef = useRef(null);
-
-const config = useMemo(() => ({
-    readonly: false,
-    placeholder: placeholder || 'Start typing...',
-    height: 600,
-    toolbarButtonSize: 'middle' as const,
-    uploader: {
-      insertImageAsBase64URI: false
-    },
-    extraButtons: [
-      {
-        name: 'customImage',
-        icon: 'image',
-        tooltip: 'Insert Image',
-        exec: (editor: any) => {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'image/*';
-          input.onchange = async (e: any) => {
-            const file = e.target.files[0];
-            if (file) {
-              const toastId = toast.loading('Uploading image...');
-              try {
-                // Dynamically import the upload function
-                const { uploadImageToFirebase } = await import('../../lib/firebase');
-                const url = await uploadImageToFirebase(file);
-                editor.selection.insertImage(url);
-                toast.success('Image inserted!', { id: toastId });
-              } catch (err) {
-                console.error("Image upload failed:", err);
-                toast.error('Upload failed', { id: toastId });
-              }
-            }
-          };
-          input.click();
-        }
-      }
-    ],
-    buttons: [
-      'source', '|',
-      'bold',
-      'strikethrough',
-      'underline',
-      'italic', '|',
-      'superscript',
-      'subscript', '|',
-      'ul',
-      'ol', '|',
-      'outdent',
-      'indent', '|',
-      'font',
-      'fontsize',
-      'brush',
-      'paragraph', '|',
-      'customImage',
-      'video',
-      'table',
-      'link', '|',
-      'align',
-      'undo',
-      'redo', '|',
-      'hr',
-      'eraser',
-      'copyformat', '|',
-      'symbol',
-      'fullsize',
-      'print'
-    ],
-  }), [placeholder]);
-
-  return (
-    <div className="word-editor-container border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      <JoditEditor
-        ref={editorRef}
-        value={value}
-        config={config}
-        tabIndex={1}
-        onBlur={newContent => onChange(newContent)}
-        onChange={newContent => onChange(newContent)}
-      />
-    </div>
-  );
-};
+import { uploadImageToFirebase } from '../../lib/firebase';
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const isEditing = !!id;
   const { lang } = useLanguage();
+  const isEditing = Boolean(id);
 
-  const [loading, setLoading] = useState(isEditing);
-  const [saving, setSaving] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const editorFrRef = useRef(null);
+  const editorEnRef = useRef(null);
+
+  const contentFrRef = useRef('');
+  const contentEnRef = useRef('');
+
   const [activeLangTab, setActiveLangTab] = useState<'fr' | 'en'>('fr');
-
   const [formData, setFormData] = useState({
     title_fr: '',
     title_en: '',
@@ -112,69 +28,98 @@ export default function Editor() {
     content_fr: '',
     content_en: '',
     featured_image_url: '',
-    is_published: false,
+    is_published: true,
     is_featured: false,
   });
 
-  const categories = ['Politique', 'Economie', 'Société', 'Culture', 'Sport', 'International'];
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Jodit config - stable reference without activeLangTab dependency to prevent re-initialization loops
+  const joditConfig = useMemo(() => ({
+    readonly: false,
+    height: 400,
+    placeholder: lang === 'fr' ? 'Rédigez votre article ici...' : 'Write your article here...',
+    buttons: [
+      'bold', 'italic', 'underline', 'strikethrough', '|',
+      'font', 'fontsize', 'brush', '|',
+      'paragraph', 'align', 'list', '|',
+      'link', 'customImage', '|',
+      'hr', 'table', 'fullsize', 'undo', 'redo'
+    ],
+    extraButtons: [
+      {
+        name: 'customImage',
+        iconURL: 'https://cdn-icons-png.flaticon.com/512/1083/1083286.png',
+        tooltip: lang === 'fr' ? 'Insérer une image' : 'Insert image',
+        exec: (editor: any) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.onchange = async (e: any) => {
+            if (e.target.files && e.target.files[0]) {
+              const file = e.target.files[0];
+              const toastId = toast.loading(lang === 'fr' ? 'Téléchargement de l\'image...' : 'Uploading image...');
+              try {
+                const { uploadImageToFirebase } = await import('../../lib/firebase');
+                const url = await uploadImageToFirebase(file);
+                editor.selection.insertHTML(`<img src="${url}" alt="image" style="max-width:100%; height:auto; margin:10px 0; border-radius:8px;" />`);
+                const updatedHTML = editor.value || editor.getEditorValue();
+                if (contentFrRef.current !== undefined) {
+                  setFormData(prev => ({ ...prev, content_fr: updatedHTML }));
+                  contentFrRef.current = updatedHTML;
+                  setFormData(prev => ({ ...prev, content_en: updatedHTML }));
+                }
+                toast.success(lang === 'fr' ? 'Image insérée !' : 'Image inserted!', { id: toastId });
+              } catch (err: any) {
+                console.error("Error inserting image:", err);
+                toast.error((lang === 'fr' ? 'Échec de l\'insertion: ' : 'Failed to insert image: ') + err.message, { id: toastId });
+              }
+            }
+          };
+          input.click();
+        }
+      }
+    ],
+    uploader: {
+      insertImageAsBase64URI: true
+    }
+  }), [lang]);
 
   useEffect(() => {
-    if (isEditing) {
-      fetchArticle();
+    if (id) {
+      setLoading(true);
+      fetchArticleById(id)
+        .then(article => {
+          if (article) {
+            setFormData({
+              title_fr: article.title_fr || '',
+              title_en: article.title_en || '',
+              slug: article.slug || '',
+              category: article.category || 'Politique',
+              content_fr: article.content_fr || '',
+              content_en: article.content_en || '',
+              featured_image_url: article.featured_image_url || article.image_url || '',
+              is_published: article.is_published ?? true,
+              is_featured: article.is_featured ?? false,
+            });
+            contentFrRef.current = article.content_fr || '';
+            contentEnRef.current = article.content_en || '';
+          }
+        })
+        .finally(() => setLoading(false));
     }
   }, [id]);
 
-  const fetchArticle = async () => {
-    try {
-      if (!id) return;
-      const data = await fetchArticleById(id);
-        
-      if (data) {
-        setFormData({
-          title_fr: data.title_fr || '',
-          title_en: data.title_en || '',
-          slug: data.slug || '',
-          category: data.category || 'Politique',
-          content_fr: data.content_fr || '',
-          content_en: data.content_en || '',
-          featured_image_url: data.featured_image_url || '',
-          is_published: data.is_published || false,
-          is_featured: data.is_featured || false,
-        });
-      } else {
-        toast.error(lang === 'fr' ? 'Article introuvable' : 'Article not found');
-      }
-    } catch (error: any) {
-      console.error("Error fetching article:", error);
-      toast.error(lang === 'fr' ? 'Erreur lors du chargement de l\'article' : 'Error loading article');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .replace(/[^\w ]+/g, '')
-      .replace(/ +/g, '-');
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    
-    setFormData(prev => {
-      const newData = { ...prev, [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value };
-      
-      if (name === 'title_fr' && !isEditing) {
-        newData.slug = generateSlug(value);
-      }
-      
-      return newData;
-    });
-  };
-
-  const handleRichTextChange = (field: 'content_fr' | 'content_en', value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setFormData(prev => ({ ...prev, [name]: checked }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,18 +127,11 @@ export default function Editor() {
     
     const file = e.target.files[0];
     setUploadingImage(true);
-
     try {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, featured_image_url: reader.result as string }));
-        setUploadingImage(false);
-      };
-      reader.onerror = () => {
-        toast.error(lang === 'fr' ? 'Erreur lors de la lecture de l\'image' : 'Error reading image');
-        setUploadingImage(false);
-      };
-      reader.readAsDataURL(file);
+      const downloadURL = await uploadImageToFirebase(file);
+      setFormData(prev => ({ ...prev, featured_image_url: downloadURL }));
+      setUploadingImage(false);
+      toast.success(lang === 'fr' ? 'Image téléchargée avec succès' : 'Image uploaded successfully');
     } catch (error: any) {
       console.error("Error processing image:", error);
       toast.error(lang === 'fr' ? 'Erreur lors du traitement de l\'image: ' + error.message : 'Error processing image: ' + error.message);
@@ -202,25 +140,44 @@ export default function Editor() {
   };
 
   const handleSubmit = async (publish: boolean) => {
-    if (!formData.title_fr && !formData.title_en) {
-      toast.error(lang === 'fr' ? 'Le titre est obligatoire' : 'Title is required');
+    let currentContentFr = contentFrRef.current || formData.content_fr;
+    let currentContentEn = contentEnRef.current || formData.content_en;
+
+    if (editorFrRef.current && (editorFrRef.current as any).value !== undefined) {
+      currentContentFr = (editorFrRef.current as any).value;
+    }
+    if (editorEnRef.current && (editorEnRef.current as any).value !== undefined) {
+      currentContentEn = (editorEnRef.current as any).value;
+    }
+
+    const titleFr = (formData.title_fr || '').trim();
+    const titleEn = (formData.title_en || '').trim();
+
+    if (!titleFr && !titleEn) {
+      toast.error(lang === 'fr' ? 'Veuillez saisir un titre' : 'Please enter a title');
+      return;
+    }
+    if (!currentContentFr && !currentContentEn) {
+      toast.error(lang === 'fr' ? 'Veuillez saisir le contenu de l\'article' : 'Please enter article content');
       return;
     }
 
     setSaving(true);
+    const toastId = toast.loading(lang === 'fr' ? 'Publication en cours...' : 'Publishing...');
+
     try {
-      const articleId = id || 'art_' + Date.now();
-      const cleanContentFr = formData.content_fr ? formData.content_fr.replace(/<[^>]*>?/gm, '').trim() : '';
-      const cleanContentEn = formData.content_en ? formData.content_en.replace(/<[^>]*>?/gm, '').trim() : cleanContentFr;
+      const articleId = id || 'art_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      const cleanContentFr = currentContentFr ? currentContentFr.replace(/<[^>]*>?/gm, '').trim() : '';
+      const cleanContentEn = currentContentEn ? currentContentEn.replace(/<[^>]*>?/gm, '').trim() : cleanContentFr;
 
       const payload = {
         id: articleId,
-        title_fr: formData.title_fr,
-        title_en: formData.title_en || formData.title_fr,
+        title_fr: titleFr || titleEn,
+        title_en: titleEn || '',
         slug: formData.slug || articleId,
         category: formData.category,
-        content_fr: formData.content_fr,
-        content_en: formData.content_en || formData.content_fr,
+        content_fr: currentContentFr || currentContentEn,
+        content_en: currentContentEn || '',
         excerpt_fr: cleanContentFr ? cleanContentFr.substring(0, 150) + '...' : '',
         excerpt_en: cleanContentEn ? cleanContentEn.substring(0, 150) + '...' : '',
         image_url: formData.featured_image_url || '',
@@ -232,12 +189,11 @@ export default function Editor() {
       };
 
       await saveArticle(payload);
-
-      toast.success(lang === 'fr' ? 'Article enregistré avec succès !' : 'Article saved successfully!');
+      toast.success(lang === 'fr' ? 'Article publié avec succès !' : 'Article published successfully!', { id: toastId });
       navigate('/admin/articles');
     } catch (error: any) {
       console.error("Error saving article:", error);
-      toast.error((lang === 'fr' ? 'Erreur lors de l\'enregistrement de l\'article: ' : 'Error saving article: ') + (error.message || ''));
+      toast.error((lang === 'fr' ? 'Erreur de publication: ' : 'Publishing error: ') + (error?.message || 'Erreur inconnue'), { id: toastId });
     } finally {
       setSaving(false);
     }
@@ -246,7 +202,6 @@ export default function Editor() {
   const handleDeleteArticle = async () => {
     if (!id) return;
     if (!window.confirm(lang === 'fr' ? 'Êtes-vous sûr de vouloir supprimer cet article ?' : 'Are you sure you want to delete this article?')) return;
-
     setSaving(true);
     try {
       await deleteArticle(id, formData.slug);
@@ -263,25 +218,26 @@ export default function Editor() {
   if (loading) return <div className="flex justify-center items-center h-64 text-gray-500">{lang === 'fr' ? 'Chargement...' : 'Loading...'}</div>;
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col gap-[32px]">
-      <div className="flex items-center justify-between">
-        <Link 
-          to="/admin/articles" 
-          className="flex items-center gap-2 text-gray-500 hover:text-charcoal transition-colors font-medium text-sm"
+    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+      {/* Top Navigation & Actions */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <button
+          onClick={() => navigate('/admin/articles')}
+          className="flex items-center gap-2 text-gray-600 hover:text-charcoal font-medium transition-colors"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={20} />
           {lang === 'fr' ? 'Retour aux articles' : 'Back to articles'}
-        </Link>
+        </button>
+
         <div className="flex items-center gap-3">
           {isEditing && (
             <button
-              type="button"
               onClick={handleDeleteArticle}
               disabled={saving}
-              className="px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 font-semibold text-sm hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+              className="p-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 cursor-pointer"
+              title={lang === 'fr' ? 'Supprimer' : 'Delete'}
             >
-              <Trash2 size={16} />
-              {lang === 'fr' ? 'Supprimer' : 'Delete'}
+              <Trash2 size={18} />
             </button>
           )}
           <button
@@ -323,9 +279,13 @@ export default function Editor() {
               onChange={handleChange}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-charcoal focus:outline-none focus:border-charcoal"
             >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
+              <option value="Politique">Politique</option>
+              <option value="Economie">Économie</option>
+              <option value="Société">Société</option>
+              <option value="Culture">Culture</option>
+              <option value="Sport">Sport</option>
+              <option value="Santé">Santé</option>
+              <option value="International">International</option>
             </select>
           </div>
 
@@ -336,119 +296,144 @@ export default function Editor() {
               name="is_featured"
               checked={formData.is_featured}
               onChange={handleChange}
-              className="w-5 h-5 rounded border-gray-300 text-charcoal focus:ring-charcoal accent-charcoal cursor-pointer"
+              className="w-5 h-5 accent-charcoal rounded cursor-pointer"
             />
             <label htmlFor="is_featured" className="text-sm font-semibold text-charcoal cursor-pointer">
-              {lang === 'fr' ? 'Mettre à la une (A la Une)' : 'Feature on homepage'}
+              {lang === 'fr' ? 'Mettre l\'article à la une (Carrousel principal)' : 'Feature article (Main carousel)'}
             </label>
           </div>
         </div>
 
-        {/* Image Upload */}
+        {/* Featured Image */}
         <div>
           <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
-            {lang === 'fr' ? 'Image de couverture' : 'Cover Image'}
+            {lang === 'fr' ? 'Image à la une' : 'Featured Image'}
           </label>
-          {formData.featured_image_url ? (
-            <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden border border-gray-200 group mb-3">
-              <img src={formData.featured_image_url} alt="Cover preview" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                <label className="bg-white text-charcoal px-4 py-2 rounded-lg font-semibold text-xs cursor-pointer hover:bg-gray-100 transition-colors">
-                  {lang === 'fr' ? 'Changer' : 'Change'}
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, featured_image_url: '' }))}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold text-xs hover:bg-red-600 transition-colors cursor-pointer"
-                >
-                  {lang === 'fr' ? 'Supprimer' : 'Remove'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <label className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-gray-400 transition-colors bg-gray-50/50">
-              <ImagePlus size={32} className="text-gray-400" />
-              <span className="text-sm font-semibold text-gray-600">
-                {uploadingImage ? (lang === 'fr' ? 'Chargement de l\'image...' : 'Uploading image...') : (lang === 'fr' ? 'Cliquer pour télécharger une image' : 'Click to upload an image')}
-              </span>
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <input
+              type="text"
+              name="featured_image_url"
+              value={formData.featured_image_url}
+              onChange={handleChange}
+              placeholder="https://..."
+              className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-charcoal focus:outline-none focus:border-charcoal"
+            />
+            <label className="bg-gray-100 hover:bg-gray-200 text-charcoal px-4 py-3 rounded-xl text-sm font-semibold cursor-pointer transition-colors flex items-center gap-2">
+              <ImagePlus size={18} />
+              <span>{uploadingImage ? (lang === 'fr' ? 'Chargement...' : 'Uploading...') : (lang === 'fr' ? 'Télécharger' : 'Upload')}</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+                className="hidden"
+              />
             </label>
+          </div>
+          {formData.featured_image_url && (
+            <div className="mt-3 relative w-full h-48 rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+              <img
+                src={formData.featured_image_url}
+                alt="Preview"
+                className="w-full h-full object-cover"
+              />
+            </div>
           )}
         </div>
 
-        {/* Bilingual Tabs */}
-        <div className="border-b border-gray-200 flex gap-4">
+        {/* Language Tabs */}
+        <div className="flex border-b border-gray-200">
           <button
             type="button"
             onClick={() => setActiveLangTab('fr')}
-            className={`pb-3 font-bold text-sm border-b-2 transition-colors cursor-pointer ${activeLangTab === 'fr' ? 'border-charcoal text-charcoal' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+              activeLangTab === 'fr'
+                ? 'border-charcoal text-charcoal'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
           >
-            🇫🇷 {lang === 'fr' ? 'Contenu en Français' : 'French Content'}
+            {lang === 'fr' ? 'Français (Obligatoire)' : 'French (Required)'}
           </button>
           <button
             type="button"
             onClick={() => setActiveLangTab('en')}
-            className={`pb-3 font-bold text-sm border-b-2 transition-colors cursor-pointer ${activeLangTab === 'en' ? 'border-charcoal text-charcoal' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+              activeLangTab === 'en'
+                ? 'border-charcoal text-charcoal'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
           >
-            🇬🇧 {lang === 'fr' ? 'Contenu en Anglais' : 'English Content'}
+            {lang === 'fr' ? 'Anglais (Optionnel)' : 'English (Optional)'}
           </button>
         </div>
 
-        {/* Content Form Fields */}
-        {activeLangTab === 'fr' ? (
-          <div className="flex flex-col gap-6">
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
-                {lang === 'fr' ? 'Titre (Français)' : 'Title (French)'}
-              </label>
-              <input
-                type="text"
-                name="title_fr"
-                value={formData.title_fr}
-                onChange={handleChange}
-                placeholder="Entrez le titre en français..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-serif text-lg font-bold text-charcoal focus:outline-none focus:border-charcoal"
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
-                {lang === 'fr' ? 'Contenu de l\'article (Français)' : 'Article Content (French)'}
-              </label>
-              <WordLikeEditor
+        {/* Form Fields - Keep BOTH mounted in DOM so Jodit instance & state is never lost when toggling tabs */}
+        <div className={activeLangTab === 'fr' ? 'block space-y-6' : 'hidden space-y-6'}>
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
+              {lang === 'fr' ? 'Titre (Français)' : 'Title (French)'} *
+            </label>
+            <input
+              type="text"
+              name="title_fr"
+              value={formData.title_fr}
+              onChange={handleChange}
+              placeholder="Ex: Titre de l'article"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-charcoal focus:outline-none focus:border-charcoal"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
+              {lang === 'fr' ? 'Contenu (Français)' : 'Content (French)'} *
+            </label>
+            <div className="prose-editor">
+              <JoditEditor
+                ref={editorFrRef}
                 value={formData.content_fr}
-                onChange={(val) => handleRichTextChange('content_fr', val)}
-                placeholder="Rédigez l'article en français..."
+                config={joditConfig}
+                onBlur={newContent => {
+                  contentFrRef.current = newContent;
+                  setFormData(prev => ({ ...prev, content_fr: newContent }));
+                }}
               />
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
-                {lang === 'fr' ? 'Titre (Anglais)' : 'Title (English)'}
-              </label>
-              <input
-                type="text"
-                name="title_en"
-                value={formData.title_en}
-                onChange={handleChange}
-                placeholder="Enter English title..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-serif text-lg font-bold text-charcoal focus:outline-none focus:border-charcoal"
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
-                {lang === 'fr' ? 'Contenu de l\'article (Anglais)' : 'Article Content (English)'}
-              </label>
-              <WordLikeEditor
+        </div>
+
+        <div className={activeLangTab === 'en' ? 'block space-y-6' : 'hidden space-y-6'}>
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
+              {lang === 'fr' ? 'Titre (Anglais)' : 'Title (English)'}
+            </label>
+            <input
+              type="text"
+              name="title_en"
+              value={formData.title_en}
+              onChange={handleChange}
+              placeholder="Ex: Article title"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-charcoal focus:outline-none focus:border-charcoal"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
+              {lang === 'fr' ? 'Contenu (Anglais)' : 'Content (English)'}
+            </label>
+            <div className="prose-editor">
+              <JoditEditor
+                ref={editorEnRef}
                 value={formData.content_en}
-                onChange={(val) => handleRichTextChange('content_en', val)}
-                placeholder="Write article content in English..."
+                config={joditConfig}
+                onBlur={newContent => {
+                  contentEnRef.current = newContent;
+                  setFormData(prev => ({ ...prev, content_en: newContent }));
+                }}
               />
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
