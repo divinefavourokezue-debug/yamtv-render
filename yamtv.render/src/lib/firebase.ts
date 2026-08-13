@@ -1,5 +1,3 @@
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -14,23 +12,64 @@ import {
   limit,
   where
 } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
 export const firestoreDatabaseId = firebaseConfig.firestoreDatabaseId || 'ai-studio-yamtv-9ce9f4cf-b30d-45f5-a0bf-58b0fd9847dc';
 export const db = getFirestore(app, firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
 export async function uploadImageToFirebase(file: File): Promise<string> {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-  const storageRef = ref(storage, `uploads/${fileName}`);
-  
-  const snapshot = await uploadBytesResumable(storageRef, file);
-  const downloadURL = await getDownloadURL(snapshot.ref);
-  return downloadURL;
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Limit max dimensions to 900px to ensure the resulting base64 string is small enough for Firestore
+        const max_size = 900; 
+
+        if (width > height) {
+          if (width > max_size) {
+            height *= max_size / width;
+            width = max_size;
+          }
+        } else {
+          if (height > max_size) {
+            width *= max_size / height;
+            height = max_size;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error("Canvas not supported"));
+          return;
+        }
+        
+        // Fill white background in case of transparent PNGs before converting to JPEG
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Compress to JPEG with 0.6 quality to keep size tiny for Firestore (limit 1MB per document)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(err);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
 }
 
 export interface FirebaseArticlePayload {
@@ -91,7 +130,7 @@ export function formatArticleForFirestore(article: any) {
     excerpt_en: truncate(article.excerpt_en || article.excerpt_fr || article.excerpt, 4800),
     content_fr: truncate(article.content_fr || article.content, 95000),
     content_en: truncate(article.content_en || article.content_fr || article.content, 95000),
-    featured_image_url: truncate(article.featured_image_url || article.image_url || article.image, 1900),
+    featured_image_url: article.featured_image_url || article.image_url || article.image || '',
     published_at: truncate(article.published_at || article.created_at || new Date().toISOString(), 90),
     is_published: isPublished,
     is_featured: !!(article.is_featured || article.featured),
@@ -151,7 +190,6 @@ export async function batchSaveArticlesToFirebase(articles: any[], onProgress?: 
     }
 
     await batch.commit();
-
     if (onProgress) {
       onProgress(Math.min(i + chunk.length, total), total);
     }
@@ -193,6 +231,7 @@ export async function testFirebaseConnection(): Promise<{ success: boolean; coun
     throw new Error(err?.message || 'Failed to connect to Firebase Firestore');
   }
 }
+
 export interface Comment {
   id: string;
   article_id: string;
@@ -215,7 +254,8 @@ export async function fetchCommentsFromFirebase(articleId?: string): Promise<Com
     const snapshot = await getDocs(q);
     const list: Comment[] = [];
     snapshot.forEach(docSnap => {
-      list.push({ ...docSnap.data(), id: docSnap.id } as Comment);
+      const data = docSnap.data() as Record<string, any>;
+      list.push({ ...data, id: docSnap.id } as Comment);
     });
     return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (err) {
