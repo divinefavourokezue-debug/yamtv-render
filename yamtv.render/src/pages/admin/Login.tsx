@@ -14,7 +14,7 @@ export default function AdminLogin() {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, loginCustomAdmin } = useAuth();
+  const { user, login } = useAuth();
   const { lang } = useLanguage();
 
   if (user) {
@@ -36,19 +36,12 @@ export default function AdminLogin() {
       return;
     }
 
-    if (trimmedPassword.length < 4) {
-      setError(lang === 'fr' ? 'Le mot de passe doit contenir au moins 4 caractères.' : 'Password must be at least 4 characters.');
-      setLoading(false);
-      return;
-    }
-
-    // Since Firebase is disabled, we just mock login successfully immediately.
     try {
-      loginCustomAdmin(trimmedEmail, trimmedEmail.split('@')[0]);
+      await login(trimmedEmail, trimmedPassword);
       navigate('/admin/dashboard');
     } catch (err: any) {
       console.error('Authentication error:', err);
-      setError('An error occurred during login');
+      setError(lang === 'fr' ? 'Identifiants incorrects.' : 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -113,7 +106,7 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="appearance-none block w-full px-4 py-3 bg-[#FFFFFF] dark:bg-[#2A2A2A] border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-[16px] text-charcoal dark:text-white placeholder-gray-400"
-                placeholder="admin@yamtv.com"
+                placeholder="admin@yamtv.bf"
               />
             </div>
 
