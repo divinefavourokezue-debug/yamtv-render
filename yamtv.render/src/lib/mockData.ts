@@ -151,13 +151,12 @@ export function extractImageFromData(data: any, contentFr: string, contentEn: st
 // Maps any raw CSV/DB row to the frontend Article interface with immaculate formatting
 export function mapSupabaseArticle(data: any): Article {
   const rawTitleFr = data.title_fr || data.title_en || data.title || data.post_title || data.name || 'Sans titre';
-  const rawTitleEn = data.title_en || data.title_fr || data.title || data.post_title || data.name || 'Untitled';
-  
+  const rawTitleEn = data.title_en || '';
   const titleFr = cleanTitle(rawTitleFr);
   const titleEn = cleanTitle(rawTitleEn);
 
   const rawContentFr = data.content_fr || data.content || data.body_fr || data.body || data.post_content || data.text || data.details || data.html || '';
-  const rawContentEn = data.content_en || data.content_fr || data.content || data.body_en || data.body || data.post_content || data.text || data.details || data.html || '';
+const rawContentEn = data.content_en || '';
 
   const contentFr = cleanAndFormatContent(rawContentFr);
   const contentEn = cleanAndFormatContent(rawContentEn);
