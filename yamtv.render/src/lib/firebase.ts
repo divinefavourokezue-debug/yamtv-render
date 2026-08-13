@@ -1,3 +1,5 @@
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -18,6 +20,18 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const firestoreDatabaseId = firebaseConfig.firestoreDatabaseId || 'ai-studio-yamtv-9ce9f4cf-b30d-45f5-a0bf-58b0fd9847dc';
 export const db = getFirestore(app, firestoreDatabaseId);
+export const auth = getAuth(app);
+export const storage = getStorage(app);
+
+export async function uploadImageToFirebase(file: File): Promise<string> {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+  const storageRef = ref(storage, `uploads/${fileName}`);
+  
+  const snapshot = await uploadBytesResumable(storageRef, file);
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return downloadURL;
+}
 
 export interface FirebaseArticlePayload {
   id: string;
