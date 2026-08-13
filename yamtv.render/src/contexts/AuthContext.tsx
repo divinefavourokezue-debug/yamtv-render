@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { onAuthStateChanged, signOut as firebaseSignOut, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 export interface AppUser {
   id: string;
@@ -15,65 +17,54 @@ interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  loginCustomAdmin: (email: string, displayName?: string) => void;
+  loginCustomAdmin: (email: string, password?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
-  loginCustomAdmin: () => {},
+  loginCustomAdmin: async () => {},
 });
-
-const LOCAL_STORAGE_KEY = 'yamtv_admin_session';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    // Check localStorage session first
-    const savedSession = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedSession) {
-      try {
-        const parsed = JSON.parse(savedSession);
-        if (parsed && parsed.email) {
-          setUser({
-            id: parsed.id || 'admin_' + Date.now(),
-            email: parsed.email,
-            displayName: parsed.displayName || parsed.email.split('@')[0],
-            role: 'admin',
-            user_metadata: { role: 'admin', full_name: parsed.displayName || parsed.email.split('@')[0] }
-          });
-        }
-      } catch (e) {
-        console.warn('Invalid saved admin session:', e);
-      }
+    const isLogged = localStorage.getItem('yamtv_admin_logged');
+    if (isLogged === 'true') {
+      setUser({
+        id: 'admin_123',
+        email: 'admin@yamtv.bf',
+        displayName: 'Admin',
+        role: 'admin',
+        user_metadata: { role: 'admin', full_name: 'Admin' }
+      });
+    } else {
+      setUser(null);
     }
-
     setLoading(false);
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
-  const loginCustomAdmin = (email: string, displayName?: string) => {
-    const adminUser: AppUser = {
-      id: 'admin_' + Date.now(),
-      email: email,
-      displayName: displayName || email.split('@')[0] || 'Admin',
-      role: 'admin',
-      user_metadata: { role: 'admin', full_name: displayName || email.split('@')[0] || 'Admin' }
-    };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(adminUser));
-    setUser(adminUser);
+  const loginCustomAdmin = async (email: string, password?: string) => {
+    if (!password) throw new Error("Password is required");
+    if (email.toLowerCase() === 'admin@yamtv.bf' && password === 'Yamtv2026!') {
+      localStorage.setItem('yamtv_admin_logged', 'true');
+      setUser({
+        id: 'admin_123',
+        email: 'admin@yamtv.bf',
+        displayName: 'Admin',
+        role: 'admin',
+        user_metadata: { role: 'admin', full_name: 'Admin' }
+      });
+    } else {
+      throw new Error("Invalid credentials");
+    }
   };
 
   const signOut = async () => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem('yamtv_admin_logged');
     setUser(null);
   };
 
