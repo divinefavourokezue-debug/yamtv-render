@@ -1,6 +1,9 @@
-import { Article, mapSupabaseArticle as mapArticleData, initialArticles } from './mockData';
-import { isAppwriteConfigured, fetchAppwriteArticles, saveAppwriteArticle, saveAppwriteArticlesBatch, deleteAppwriteArticle } from './appwrite';
-
+import { 
+  fetchArticlesFromFirebase, 
+  saveArticleToFirebase as fbSave, 
+  batchSaveArticlesToFirebase as fbBatchSave, 
+  deleteArticleFromFirebase as fbDelete 
+} from './firebase';
 let memoryCache: Article[] | null = null;
 const PRIMARY_CACHE_KEY = 'yamtv_articles_cache_v8';
 
